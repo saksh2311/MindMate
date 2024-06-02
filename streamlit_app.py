@@ -97,7 +97,7 @@ If a question does not make any sense, or is not factually coherent, explain why
     input_ids = tokenizer.encode(string_dialogue, return_tensors="pt")
 
     # Generate the response
-    output = model.generate(input_ids, max_length=150, temperature=0.7, top_p=0.9, repetition_penalty=1.0)
+    output = model.generate(input_ids, max_new_tokens=100, temperature=0.7, top_p=0.9, repetition_penalty=1.0)
 
     # Decode the output and return the response
     response = tokenizer.decode(output[0], skip_special_tokens=True)
