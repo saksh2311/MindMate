@@ -31,12 +31,14 @@ st.set_page_config(page_title="MindMate 🧠")
 base_model = 'meta-llama/Llama-2-7b-chat-hf'
 adapter_model = "Mental-Health-Chatbot"  # Path to your adapter model directory
 
-# Load the base model and adapter model
-model = AutoModelForCausalLM.from_pretrained(base_model)
-model = PeftModel.from_pretrained(model, adapter_model)
+@st.cache_resource
+def load_model_and_tokenizer(base_model, adapter_model):
+    model = AutoModelForCausalLM.from_pretrained(base_model, torch_dtype=torch.float16, low_cpu_mem_usage=True)
+    model = PeftModel.from_pretrained(model, adapter_model)
+    tokenizer = AutoTokenizer.from_pretrained(base_model)
+    return model, tokenizer
 
-# Load the tokenizer
-tokenizer = AutoTokenizer.from_pretrained(adapter_model)
+model, tokenizer = load_model_and_tokenizer(base_model, adapter_model)
 
 # Replicate Credentials
 with st.sidebar:
