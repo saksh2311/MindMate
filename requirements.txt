@@ -1,2 +1,5 @@
 streamlit
 replicate
+torch
+transformers
+peft
