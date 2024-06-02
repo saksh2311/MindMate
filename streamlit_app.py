@@ -21,10 +21,8 @@ from huggingface_hub import login
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from peft import PeftModel, PeftConfig
 
-# Set up your Hugging Face token
-hf_token = "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"
-
 # Log in to Hugging Face
+hf_token = st.secrets["HF_TOKEN"]
 login(hf_token)
 # App title
 st.set_page_config(page_title="MindMate 🧠")
