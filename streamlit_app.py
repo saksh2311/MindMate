@@ -22,7 +22,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 from peft import PeftModel, PeftConfig
 
 # Set up your Hugging Face token
-hf_token = "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"
+hf_token = "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"
 
 # Log in to Hugging Face
 login(hf_token)
