@@ -1,14 +1,33 @@
 import streamlit as st
 import replicate
 import os
-from transformers import AutoModelForCausalLM, AutoTokenizer
-from peft import PeftModel
 import torch
+import subprocess
 
+def install(package):
+    subprocess.check_call([sys.executable, "-m", "pip", "install", package])
+
+try:
+    import transformers
+    import peft
+    import huggingface_hub
+except ImportError:
+    install("transformers")
+    install("peft")
+    install("huggingface_hub")
+
+# Import necessary libraries after installation
+from huggingface_hub import login
+from transformers import AutoModelForCausalLM, AutoTokenizer
+from peft import PeftModel, PeftConfig
+
+# Set up your Hugging Face token
+hf_token = "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"
+
+# Log in to Hugging Face
+login(hf_token)
 # App title
 st.set_page_config(page_title="MindMate 🧠")
-# Set up your Hugging Face token and log in
-hf_token = "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"
 
 # Base model and adapter model paths
 base_model = 'meta-llama/Llama-2-7b-chat-hf'
