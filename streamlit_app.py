@@ -35,7 +35,7 @@ adapter_model = "Mental-Health-Chatbot"  # Path to your adapter model directory
 def load_model_and_tokenizer(base_model, adapter_model):
     model = AutoModelForCausalLM.from_pretrained(base_model, torch_dtype=torch.float16, low_cpu_mem_usage=True)
     model = PeftModel.from_pretrained(model, adapter_model)
-    tokenizer = AutoTokenizer.from_pretrained(base_model)
+    tokenizer = AutoTokenizer.from_pretrained(adapter_model)
     return model, tokenizer
 
 model, tokenizer = load_model_and_tokenizer(base_model, adapter_model)
