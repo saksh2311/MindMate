@@ -3,7 +3,13 @@ import replicate
 import os
 import torch
 import subprocess
+import logging  # Import the logging module
 
+# Set up logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
+# Function to install required packages
 def install(package):
     subprocess.check_call([sys.executable, "-m", "pip", "install", package])
 
@@ -24,8 +30,11 @@ from peft import PeftModel, PeftConfig
 # Log in to Hugging Face
 hf_token = st.secrets["HF_TOKEN"]
 login(hf_token)
+logger.info("Login successful")  # Log successful login
+
 # App title
 st.set_page_config(page_title="MindMate 🧠")
+logger.info("Streamlit app started")  # Log app start
 
 # Base model and adapter model paths
 base_model = 'meta-llama/Llama-2-7b-chat-hf'
@@ -34,12 +43,15 @@ adapter_model = "Mental-Health-Chatbot"  # Path to your adapter model directory
 @st.cache_resource
 def load_model_and_tokenizer(base_model, adapter_model):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    logger.info(f"Loading model on device: {device}")
     model = AutoModelForCausalLM.from_pretrained(base_model, torch_dtype=torch.float16, low_cpu_mem_usage=True).to(device)
     model = PeftModel.from_pretrained(model, adapter_model)
     tokenizer = AutoTokenizer.from_pretrained(base_model)
     return model, tokenizer, device
 
 model, tokenizer, device = load_model_and_tokenizer(base_model, adapter_model)
+logger.info("Model and tokenizer loaded successfully")
+
 # Replicate Credentials
 with st.sidebar:
     st.title('MindMate 🧠')
@@ -72,7 +84,8 @@ for message in st.session_state.messages:
 
 def clear_chat_history():
     st.session_state.messages = [{"role": "assistant", "content": "How may I assist you today?"}]
-st.sidebar.button('Clear Chat History', on_click=clear_chat_history)
+    logger.info("Chat history cleared")
+st.sidebar.button('Clear Chat History', on_click=clear_chat_history, key='clear_chat_history_button')
 
 def generate_llama2_response(prompt_input):
     # Updated dialogue string for mental health chatbot
@@ -90,32 +103,4 @@ If a question does not make any sense, or is not factually coherent, explain why
     string_dialogue += f"User: {prompt_input}\n\nAssistant: "
 
     # Encode the input string
-    input_ids = tokenizer.encode(string_dialogue, return_tensors="pt").to(model.device)
-
-    # Generate the response
-    output = model.generate(input_ids, max_new_tokens=max_length, temperature=temperature, top_p=top_p, repetition_penalty=1.0)
-
-    # Decode the output and return the response
-    response = tokenizer.decode(output[0], skip_special_tokens=True)
-    response = response.split("Assistant: ")[-1]  # Extract the relevant part of the response
-    return response.strip()
-
-# User-provided prompt
-if prompt := st.chat_input(disabled=not replicate_api):
-    st.session_state.messages.append({"role": "user", "content": prompt})
-    with st.chat_message("user"):
-        st.write(prompt)
-
-# Generate a new response if last message is not from assistant
-if st.session_state.messages[-1]["role"] != "assistant":
-    with st.chat_message("assistant"):
-        with st.spinner("Thinking..."):
-            response = generate_llama2_response(prompt)
-            placeholder = st.empty()
-            full_response = ''
-            for item in response:
-                full_response += item
-                placeholder.markdown(full_response)
-            placeholder.markdown(full_response)
-    message = {"role": "assistant", "content": full_response}
-    st.session_state.messages.append(message)
+    input_ids = tokenizer.encode(string_dialogue
