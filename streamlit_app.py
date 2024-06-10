@@ -50,28 +50,9 @@ def load_model_and_tokenizer(base_model, adapter_model):
     return model, tokenizer, device
 
 model, tokenizer, device = load_model_and_tokenizer(base_model, adapter_model)
-# Hardcoded input text for testing
-input_text = "Hi ! I don't want to do my work"
-logger.info(f"Hardcoded input text: {input_text}")
 
 if model and tokenizer:
-    # Tokenize the input text
-    input_ids = tokenizer.encode(input_text, return_tensors="pt").to(device)
-
-    # Generate the output text
-    output = model.generate(input_ids)
-    predicted_text = tokenizer.decode(output[0], skip_special_tokens=False)
-    logger.info(f"Generated response: {predicted_text}")
-
-    # Print the predicted text
-    print(predicted_text)
-
-    # Log the predicted text
-    logger.info(f"Predicted text: {predicted_text}")
-
-    # Open a file in append mode and write the predicted text to it
-    with open("predicted_outputs.txt", "a") as f:
-        f.write(predicted_text + "\n")
+    logger.info("Model and tokenizer not loaded correctly")
 else:
     logger.error("Model and tokenizer not loaded correctly")
 
