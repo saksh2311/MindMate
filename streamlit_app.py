@@ -9,7 +9,6 @@ import logging  # Import the logging module
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# Function to install required packages
 def install(package):
     subprocess.check_call([sys.executable, "-m", "pip", "install", package])
 
@@ -35,6 +34,7 @@ logger.info("Login successful")  # Log successful login
 # App title
 st.set_page_config(page_title="MindMate 🧠")
 logger.info("Streamlit app started")  # Log app start
+
 
 # Base model and adapter model paths
 base_model = 'meta-llama/Llama-2-7b-chat-hf'
@@ -103,4 +103,35 @@ If a question does not make any sense, or is not factually coherent, explain why
     string_dialogue += f"User: {prompt_input}\n\nAssistant: "
 
     # Encode the input string
-    input_ids = tokenizer.encode(string_dialogue
+    input_ids = tokenizer.encode(string_dialogue, return_tensors="pt").to(model.device)
+    logger.info("Input text tokenized")  # Log tokenization
+
+    # Generate the response
+    output = model.generate(input_ids, max_new_tokens=max_length, temperature=temperature, top_p=top_p, repetition_penalty=1.0)
+
+    # Decode the output and return the response
+    response = tokenizer.decode(output[0], skip_special_tokens=True)
+    response = response.split("Assistant: ")[-1]  # Extract the relevant part of the response
+    logger.info(f"Generated response: {response}")  # Log generated response
+    return response.strip()
+
+# User-provided prompt
+if prompt := st.chat_input(disabled=not replicate_api):
+    st.session_state.messages.append({"role": "user", "content": prompt})
+    with st.chat_message("user"):
+        st.write(prompt)
+
+# Generate a new response if last message is not from assistant
+if st.session_state.messages[-1]["role"] != "assistant":
+    with st.chat_message("assistant"):
+        with st.spinner("Thinking..."):
+            response = generate_llama2_response(prompt)
+            placeholder = st.empty()
+            full_response = ''
+            for item in response:
+                full_response += item
+                placeholder.markdown(full_response)
+            placeholder.markdown(full_response)
+    message = {"role": "assistant", "content": full_response}
+    st.session_state.messages.append(message)
+    logger.info("Assistant response added to session state")  # Log addition of assistant response
