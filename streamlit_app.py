@@ -33,13 +33,13 @@ adapter_model = "Mental-Health-Chatbot"  # Path to your adapter model directory
 
 @st.cache_resource
 def load_model_and_tokenizer(base_model, adapter_model):
-    model = AutoModelForCausalLM.from_pretrained(base_model, torch_dtype=torch.float16, low_cpu_mem_usage=True)
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    model = AutoModelForCausalLM.from_pretrained(base_model, torch_dtype=torch.float16, low_cpu_mem_usage=True).to(device)
     model = PeftModel.from_pretrained(model, adapter_model)
-    tokenizer = AutoTokenizer.from_pretrained(adapter_model)
-    return model, tokenizer
+    tokenizer = AutoTokenizer.from_pretrained(base_model)
+    return model, tokenizer, device
 
-model, tokenizer = load_model_and_tokenizer(base_model, adapter_model)
-
+model, tokenizer, device = load_model_and_tokenizer(base_model, adapter_model)
 # Replicate Credentials
 with st.sidebar:
     st.title('MindMate 🧠')
@@ -75,33 +75,20 @@ def clear_chat_history():
 st.sidebar.button('Clear Chat History', on_click=clear_chat_history)
 
 def generate_llama2_response(prompt_input):
-    # Updated dialogue string for mental health chatbot
-    string_dialogue = """You are a helpful and joyous mental therapy assistant. Always answer as helpfully and cheerfully as possible, while being safe. Your answers should not include any harmful, unethical, racist, sexist, toxic, dangerous, or illegal content. Please ensure that your responses are socially unbiased and positive in nature.
-
-If a question does not make any sense, or is not factually coherent, explain why instead of answering something not correct. If you don't know the answer to a question, please don't share false information.
-\n\n"""
+    string_dialogue = "You are a helpful assistant. You do not respond as 'User' or pretend to be 'User'. You only respond once as 'Assistant'."
     for dict_message in st.session_state.messages:
         if dict_message["role"] == "user":
             string_dialogue += "User: " + dict_message["content"] + "\n\n"
         else:
             string_dialogue += "Assistant: " + dict_message["content"] + "\n\n"
-
-    # Add the latest user input
-    string_dialogue += f"User: {prompt_input}\n\nAssistant: "
-
-    # Encode the input string
-    input_ids = tokenizer.encode(string_dialogue, return_tensors="pt").to(model.device)
-
-    # Generate the response
+    input_ids = tokenizer.encode(f"{string_dialogue} {prompt_input} Assistant: ", return_tensors="pt").to(device)
     output = model.generate(input_ids, max_new_tokens=max_length, temperature=temperature, top_p=top_p, repetition_penalty=1.0)
-
-    # Decode the output and return the response
     response = tokenizer.decode(output[0], skip_special_tokens=True)
-    response = response.split("Assistant: ")[-1]  # Extract the relevant part of the response
-    return response.strip()
+    response = response.split("Assistant: ")[-1].strip()  # Extract the relevant part of the response
+    return response
 
 # User-provided prompt
-if prompt := st.chat_input(disabled=not replicate_api):
+if prompt := st.chat_input():
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.write(prompt)
@@ -110,12 +97,6 @@ if prompt := st.chat_input(disabled=not replicate_api):
 if st.session_state.messages[-1]["role"] != "assistant":
     with st.chat_message("assistant"):
         with st.spinner("Thinking..."):
-            response = generate_llama2_response(prompt)
-            placeholder = st.empty()
-            full_response = ''
-            for item in response:
-                full_response += item
-                placeholder.markdown(full_response)
-            placeholder.markdown(full_response)
-    message = {"role": "assistant", "content": full_response}
-    st.session_state.messages.append(message)
+            response = generate_llama2_response(st.session_state.messages[-1]["content"])
+            st.markdown(response)
+    st.session_state.messages.append({"role": "assistant", "content": response})
