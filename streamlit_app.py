@@ -52,7 +52,7 @@ def load_model_and_tokenizer(base_model, adapter_model):
 model, tokenizer, device = load_model_and_tokenizer(base_model, adapter_model)
 
 if model and tokenizer:
-    logger.info("Model and tokenizer not loaded correctly")
+    logger.info("Model and tokenizer loaded correctly")
 else:
     logger.error("Model and tokenizer not loaded correctly")
 
