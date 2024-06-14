@@ -1,25 +1,56 @@
 import streamlit as st
-import replicate
 import os
+import torch
+import subprocess
+import logging
+from huggingface_hub import login
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from peft import PeftModel
-import torch
+
+# Set up logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
+def install(package):
+    subprocess.check_call([sys.executable, "-m", "pip", "install", package])
+
+try:
+    import transformers
+    import peft
+    import huggingface_hub
+except ImportError:
+    install("transformers")
+    install("peft")
+    install("huggingface_hub")
+
+# Log in to Hugging Face
+hf_token = st.secrets["HF_TOKEN"]
+login(hf_token)
+logger.info("Login successful")
 
 # App title
 st.set_page_config(page_title="MindMate 🧠")
-# Set up your Hugging Face token and log in
-hf_token = "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"
+logger.info("Streamlit app started")
 
 # Base model and adapter model paths
 base_model = 'meta-llama/Llama-2-7b-chat-hf'
 adapter_model = "Mental-Health-Chatbot"  # Path to your adapter model directory
 
-# Load the base model and adapter model
-model = AutoModelForCausalLM.from_pretrained(base_model)
-model = PeftModel.from_pretrained(model, adapter_model)
+@st.cache_resource
+def load_model_and_tokenizer(base_model, adapter_model):
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    logger.info(f"Loading model on device: {device}")
+    model = AutoModelForCausalLM.from_pretrained(base_model, torch_dtype=torch.float16, low_cpu_mem_usage=True).to(device)
+    model = PeftModel.from_pretrained(model, adapter_model)
+    tokenizer = AutoTokenizer.from_pretrained(base_model)
+    return model, tokenizer, device
 
-# Load the tokenizer
-tokenizer = AutoTokenizer.from_pretrained(adapter_model)
+model, tokenizer, device = load_model_and_tokenizer(base_model, adapter_model)
+
+if model and tokenizer:
+    logger.info("Model and tokenizer loaded correctly")
+else:
+    logger.error("Model and tokenizer not loaded correctly")
 
 # Replicate Credentials
 with st.sidebar:
@@ -36,18 +67,13 @@ with st.sidebar:
             st.success('Proceed to entering your prompt message!', icon='👉')
     os.environ['REPLICATE_API_TOKEN'] = replicate_api
 
-    st.subheader('Models and parameters')
-    selected_model = st.sidebar.selectbox('Choose a Llama2 model', ['Llama2-7B', 'Llama2-13B'], key='selected_model')
-    if selected_model == 'Llama2-7B':
-        llm = 'a16z-infra/llama7b-v2-chat:4f0a4744c7295c024a1de15e1a63c880d3da035fa1f49bfd344fe076074c8eea'
-    elif selected_model == 'Llama2-13B':
-        llm = 'a16z-infra/llama13b-v2-chat:df7690f1994d94e96ad9d568eac121aecf50684a0b0963b25a41cc40061269e5'
-    temperature = st.sidebar.slider('temperature', min_value=0.01, max_value=1.0, value=0.1, step=0.01)
-    top_p = st.sidebar.slider('top_p', min_value=0.01, max_value=1.0, value=0.9, step=0.01)
-    max_length = st.sidebar.slider('max_length', min_value=32, max_value=128, value=120, step=8)
+    st.subheader('Parameters')
+    temperature = st.slider('Temperature', min_value=0.01, max_value=1.0, value=0.7, step=0.01)
+    top_p = st.slider('Top P', min_value=0.01, max_value=1.0, value=0.9, step=0.01)
+    max_length = st.slider('Max Length', min_value=32, max_value=128, value=100, step=8)
 
 # Store LLM generated responses
-if "messages" not in st.session_state.keys():
+if "messages" not in st.session_state:
     st.session_state.messages = [{"role": "assistant", "content": "How may I assist you today?"}]
 
 # Display or clear chat messages
@@ -57,7 +83,8 @@ for message in st.session_state.messages:
 
 def clear_chat_history():
     st.session_state.messages = [{"role": "assistant", "content": "How may I assist you today?"}]
-st.sidebar.button('Clear Chat History', on_click=clear_chat_history)
+    logger.info("Chat history cleared")
+st.sidebar.button('Clear Chat History', on_click=clear_chat_history, key='clear_chat_history_button')
 
 def generate_llama2_response(prompt_input):
     # Updated dialogue string for mental health chatbot
@@ -75,14 +102,17 @@ If a question does not make any sense, or is not factually coherent, explain why
     string_dialogue += f"User: {prompt_input}\n\nAssistant: "
 
     # Encode the input string
-    input_ids = tokenizer.encode(string_dialogue, return_tensors="pt")
+    input_ids = tokenizer.encode(string_dialogue, return_tensors="pt").to(model.device)
+    logger.info("Input text tokenized")
 
     # Generate the response
-    output = model.generate(input_ids, max_length=150, temperature=0.7, top_p=0.9, repetition_penalty=1.0)
+    output = model.generate(input_ids, max_new_tokens=max_length, temperature=temperature, top_p=top_p, repetition_penalty=1.0)
 
     # Decode the output and return the response
     response = tokenizer.decode(output[0], skip_special_tokens=True)
-    return response
+    response = response.split("Assistant: ")[-1]
+    logger.info(f"Generated response: {response}")
+    return response.strip()
 
 # User-provided prompt
 if prompt := st.chat_input(disabled=not replicate_api):
@@ -94,7 +124,7 @@ if prompt := st.chat_input(disabled=not replicate_api):
 if st.session_state.messages[-1]["role"] != "assistant":
     with st.chat_message("assistant"):
         with st.spinner("Thinking..."):
-            response = generate_llama2_response(prompt)
+            response = generate_llama2_response(st.session_state.messages[-1]["content"])
             placeholder = st.empty()
             full_response = ''
             for item in response:
@@ -103,3 +133,4 @@ if st.session_state.messages[-1]["role"] != "assistant":
             placeholder.markdown(full_response)
     message = {"role": "assistant", "content": full_response}
     st.session_state.messages.append(message)
+    logger.info("Assistant response added to session state")
