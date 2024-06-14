@@ -43,7 +43,7 @@ def main():
     base_model = 'meta-llama/Llama-2-7b-chat-hf'
     adapter_model = "Mental-Health-Chatbot"  # Path to your adapter model directory
 
-    hf_token = st.secrets["huggingface"]["token"]
+    hf_token = st.secrets["HF_TOKEN"]
     model, tokenizer, device = load_model_and_tokenizer(base_model, adapter_model, hf_token)
 
     # Streamlit UI
