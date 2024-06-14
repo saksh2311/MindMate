@@ -60,7 +60,8 @@ def main():
             st.write(response)
         else:
             st.warning("Please enter a message to get a response.")
-
+            
+@st.cache
 def generate_llama2_response(model, tokenizer, device, prompt_input):
     input_ids = tokenizer.encode(prompt_input, return_tensors="pt").to(device)
     logger.info("Input text tokenized")
