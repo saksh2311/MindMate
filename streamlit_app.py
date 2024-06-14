@@ -1,9 +1,11 @@
 import streamlit as st
-import replicate
 import os
 import torch
 import subprocess
-import logging  # Import the logging module
+import logging
+from huggingface_hub import login
+from transformers import AutoModelForCausalLM, AutoTokenizer
+from peft import PeftModel
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -21,41 +23,29 @@ except ImportError:
     install("peft")
     install("huggingface_hub")
 
-# Import necessary libraries after installation
-from huggingface_hub import login
-from transformers import AutoModelForCausalLM, AutoTokenizer
-from peft import PeftModel, PeftConfig
-
-# Log in to Hugging Face
-hf_token = st.secrets["HF_TOKEN"]
-login(hf_token)
-logger.info("Login successful")  # Log successful login
-
 # App title
 st.set_page_config(page_title="MindMate 🧠")
-logger.info("Streamlit app started")  # Log app start
-
+logger.info("Streamlit app started")
 
 # Base model and adapter model paths
 base_model = 'meta-llama/Llama-2-7b-chat-hf'
 adapter_model = "Mental-Health-Chatbot"  # Path to your adapter model directory
 
 @st.cache_resource
-def load_model_and_tokenizer(base_model, adapter_model):
+def init_app(hf_token):
+    login(hf_token)
+    logger.info("Login successful")
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     logger.info(f"Loading model on device: {device}")
     model = AutoModelForCausalLM.from_pretrained(base_model, torch_dtype=torch.float16, low_cpu_mem_usage=True).to(device)
     model = PeftModel.from_pretrained(model, adapter_model)
     tokenizer = AutoTokenizer.from_pretrained(base_model)
+    logger.info("Model and tokenizer loaded correctly")
     return model, tokenizer, device
 
-model, tokenizer, device = load_model_and_tokenizer(base_model, adapter_model)
-
-if model and tokenizer:
-    logger.info("Model and tokenizer loaded correctly")
-else:
-    logger.error("Model and tokenizer not loaded correctly")
-
+# Ensure login and model loading happen only once
+hf_token = st.secrets["HF_TOKEN"]
+model, tokenizer, device = init_app(hf_token)
 
 # Replicate Credentials
 with st.sidebar:
@@ -77,9 +67,8 @@ with st.sidebar:
     top_p = st.slider('Top P', min_value=0.01, max_value=1.0, value=0.9, step=0.01)
     max_length = st.slider('Max Length', min_value=32, max_value=128, value=100, step=8)
 
-
 # Store LLM generated responses
-if "messages" not in st.session_state.keys():
+if "messages" not in st.session_state:
     st.session_state.messages = [{"role": "assistant", "content": "How may I assist you today?"}]
 
 # Display or clear chat messages
@@ -109,15 +98,15 @@ If a question does not make any sense, or is not factually coherent, explain why
 
     # Encode the input string
     input_ids = tokenizer.encode(string_dialogue, return_tensors="pt").to(model.device)
-    logger.info("Input text tokenized")  # Log tokenization
+    logger.info("Input text tokenized")
 
     # Generate the response
     output = model.generate(input_ids, max_new_tokens=max_length, temperature=temperature, top_p=top_p, repetition_penalty=1.0)
 
     # Decode the output and return the response
     response = tokenizer.decode(output[0], skip_special_tokens=True)
-    response = response.split("Assistant: ")[-1]  # Extract the relevant part of the response
-    logger.info(f"Generated response: {response}")  # Log generated response
+    response = response.split("Assistant: ")[-1]
+    logger.info(f"Generated response: {response}")
     return response.strip()
 
 # User-provided prompt
@@ -130,7 +119,7 @@ if prompt := st.chat_input(disabled=not replicate_api):
 if st.session_state.messages[-1]["role"] != "assistant":
     with st.chat_message("assistant"):
         with st.spinner("Thinking..."):
-            response = generate_llama2_response(prompt)
+            response = generate_llama2_response(st.session_state.messages[-1]["content"])
             placeholder = st.empty()
             full_response = ''
             for item in response:
@@ -139,4 +128,4 @@ if st.session_state.messages[-1]["role"] != "assistant":
             placeholder.markdown(full_response)
     message = {"role": "assistant", "content": full_response}
     st.session_state.messages.append(message)
-    logger.info("Assistant response added to session state")  # Log addition of assistant response
+    logger.info("Assistant response added to session state")
