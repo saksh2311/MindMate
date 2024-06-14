@@ -49,10 +49,17 @@ def main():
     # Streamlit UI
     st.title("MindMate 🧠")
 
+    st.write("## Chat with the MindMate Assistant")
+    st.write("Enter your message below and get a response from the assistant.")
+
     prompt = st.text_input("Enter your message:")
-    if prompt:
-        response = generate_llama2_response(model, tokenizer, device, prompt)
-        st.write("Assistant:", response)
+    if st.button("Get Response"):
+        if prompt:
+            response = generate_llama2_response(model, tokenizer, device, prompt)
+            st.write("### Assistant Response:")
+            st.write(response)
+        else:
+            st.warning("Please enter a message to get a response.")
 
 def generate_llama2_response(model, tokenizer, device, prompt_input):
     input_ids = tokenizer.encode(prompt_input, return_tensors="pt").to(device)
